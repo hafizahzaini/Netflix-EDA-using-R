@@ -1,0 +1,141 @@
+---
+title: "Netflix EDA"
+author: "Nurul Hafizah Zaini"
+date: "2025-06-30"
+output: html_document
+---
+
+## Introduction
+### Dataset 
+
+The dataset was obtained from an open-source Kaggle platform. This dataset consists of listings of all the movies and tv shows available on Netflix, along with details such as - cast, directors, ratings, release year, duration, etc.
+
+### Project Context
+
+The project aims to explore trends on type distribution, genres over time, and missing values. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 5)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+```
+
+## Load Dataset
+
+```{r, warning=FALSE, echo = FALSE}
+df <- read_csv("data/netflix_titles.csv")
+```
+
+## Dataset Overview
+### Dataset head
+```{r, warning=FALSE, echo = FALSE}
+head(df)
+```
+
+### Dataset summary
+```{r, warning=FALSE, echo = FALSE}
+summary(df)
+```
+
+### Dataset dimension
+```{r, warning=FALSE, echo = FALSE}
+dim(df)
+```
+
+### Columns' names
+```{r, warning=FALSE, echo = FALSE}
+names(df)
+```
+
+### Check for missing Value
+
+```{r, warning=FALSE, echo = FALSE}
+colSums(is.na(df))
+```
+
+## Exploratory Data Analysis (EDA)
+### Movies vs Tv Shows
+
+```{r, warning=FALSE, echo = FALSE}
+df %>%
+  count(type) %>%
+  ggplot(aes(x = type, y = n, fill = type)) +
+  geom_col() +
+  labs(title = "Distribution by Type", y = "Count")
+```
+
+Key insight: The majority of Netflix catalog is Movie type. It makes up about 2/3 of the Netflix titles.  
+
+### Titles Added by Year
+
+```{r, warning=FALSE, echo = FALSE}
+df %>%
+  mutate(date_added = mdy(date_added),
+         year_added = year(date_added)) %>%
+  count(year_added) %>%
+  ggplot(aes(x = year_added, y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Number of Titles Added per Year",
+       x = "Year",
+       y = "Count")
+```
+
+Key insight: The number of new titles increased sharply from 2016 to 2019. A slight reduction in 2020–2021 may reflect COVID-19 impacts on production and acquisitions. 
+
+### Top Genres Per Year
+
+```{r, warning=FALSE, echo = FALSE}
+genre_year <- df %>%
+  mutate(
+    date_added = lubridate::mdy(date_added),
+    year_added = lubridate::year(date_added)
+  ) %>%
+  filter(!is.na(listed_in), !is.na(year_added), year_added >= 2016, year_added <= 2021) %>%
+  separate_rows(listed_in, sep = ", ")
+
+top_genres <- genre_year %>%
+  group_by(year_added, listed_in) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(year_added) %>%
+  slice_max(order_by = count, n = 5) %>%
+  ungroup()
+
+ggplot(top_genres, aes(x = reorder(listed_in, count), y = count, fill = listed_in)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~ year_added) +
+  labs(title = "Top 5 Genres by Year (2016–2021)", x = "Genre", y = "Count")
+
+```
+
+Key insight: Consistently popular genre are International Movies, Dramas, Comedies and International TV Shows. 
+
+## Genres Trend Over The Year
+```{r, warning=FALSE, echo = FALSE}
+selected_genres <- c("Dramas", "Comedies", "Documentaries", "Action & Adventure")
+
+genre_trend <- top_genres %>%
+  filter(listed_in %in% selected_genres)
+
+ggplot(genre_trend, aes(x = year_added, y = count, color = listed_in)) +
+  geom_line(linewidth = 1.2) +
+  geom_point() +
+  labs(title = "Selected Genre Trends Over Time",
+       x = "Year", y = "Number of Titles", color = "Genre") +
+  theme_minimal()
+```
+
+Key insight: 
+
+- Dramas saw a sharp increase between 2016 and 2019, peaking in 2019 with over 550 titles added, before a slight decline in 2020–2021.
+
+- Comedies followed a similar pattern, with steady growth up to 2019 and a noticeable drop in 2021.
+
+- Documentaries rose rapidly between 2016–2017 but plateaued afterward, indicating early investment that later stabilized.
+
+- Action & Adventure remained relatively flat across all years, suggesting consistent but modest investment in this genre.
+
+- The overall decline across genres in 2020–2021 may reflect production slowdowns during the COVID-19 pandemic.
